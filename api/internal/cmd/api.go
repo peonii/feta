@@ -36,6 +36,9 @@ func APICmd(ctx context.Context) *cobra.Command {
 
 			pg, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 			if err != nil {
+				logger.Error("Failed to connect to database",
+					zap.Error(err),
+				)
 				return err
 			}
 
@@ -58,38 +61,33 @@ func APICmd(ctx context.Context) *cobra.Command {
 
 			a, err := api.MakeAPI(ctx, logger, pg, ws, rdb)
 			if err != nil {
+				logger.Error("Failed to make API",
+					zap.Error(err),
+				)
+
 				return err
 			}
 
 			srv := a.Server()
 
-			go func() {
-				if err := ws.Serve(); err != nil {
-					logger.Error("Socket.io listen error",
-						zap.Error(err),
-					)
-				}
-			}()
+			// go func() {
+			// 	if err := ws.Serve(); err != nil {
+			// 		logger.Error("Socket.io listen error",
+			// 			zap.Error(err),
+			// 		)
+			// 	}
+			// }()
 
-			logger.Info("Started Socket.IO server")
+			// logger.Info("Started Socket.IO server")
 
-			go func() {
-				if err := srv.ListenAndServe(); err != nil {
-					logger.Error("HTTP listen error",
-						zap.Error(err),
-					)
-				}
-			}()
+			go func() { _ = srv.ListenAndServe() }()
 
 			logger.Info("Started HTTP server")
 
 			<-ctx.Done()
 
 			srv.Shutdown(ctx)
-			logger.Info("Closed HTTP server")
-
 			ws.Close()
-			logger.Info("Closed Socket.IO server")
 
 			return nil
 		},
